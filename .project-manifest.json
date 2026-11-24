@@ -1,0 +1,397 @@
+{
+  "name": "色谱批次核算台",
+  "project_shape": "fullstack",
+  "modules": [
+    {
+      "id": "routes",
+      "path": "chromaledger/routes.py",
+      "responsibility": "本机 HTTP 接口"
+    },
+    {
+      "id": "encoding",
+      "path": "chromaledger/encoding.py",
+      "responsibility": "确定性编码与摘要"
+    },
+    {
+      "id": "intake",
+      "path": "chromaledger/intake.py",
+      "responsibility": "预检与导入编排"
+    },
+    {
+      "id": "sequence",
+      "path": "chromaledger/sequence.py",
+      "responsibility": "进样序列校验"
+    },
+    {
+      "id": "method",
+      "path": "chromaledger/method.py",
+      "responsibility": "方法与窗口校验"
+    },
+    {
+      "id": "peaks",
+      "path": "chromaledger/peaks.py",
+      "responsibility": "峰表字段校验"
+    },
+    {
+      "id": "peak_csv",
+      "path": "chromaledger/peak_csv.py",
+      "responsibility": "两种仪器文件的关联"
+    },
+    {
+      "id": "repository",
+      "path": "chromaledger/repository.py",
+      "responsibility": "批次与封存查询"
+    },
+    {
+      "id": "alignment",
+      "path": "chromaledger/alignment.py",
+      "responsibility": "定位峰检测"
+    },
+    {
+      "id": "assignment",
+      "path": "chromaledger/assignment.py",
+      "responsibility": "组分峰归属"
+    },
+    {
+      "id": "calibration",
+      "path": "chromaledger/calibration.py",
+      "responsibility": "最小二乘曲线拟合"
+    },
+    {
+      "id": "analysis",
+      "path": "chromaledger/analysis.py",
+      "responsibility": "批内数据流编排"
+    },
+    {
+      "id": "blank",
+      "path": "chromaledger/blank.py",
+      "responsibility": "空白判定"
+    },
+    {
+      "id": "quality",
+      "path": "chromaledger/quality.py",
+      "responsibility": "核查样判定"
+    },
+    {
+      "id": "quantification",
+      "path": "chromaledger/quantification.py",
+      "responsibility": "反算与量程判断"
+    },
+    {
+      "id": "eligibility",
+      "path": "chromaledger/eligibility.py",
+      "responsibility": "样品交付判定"
+    },
+    {
+      "id": "snapshots",
+      "path": "chromaledger/snapshots.py",
+      "responsibility": "封存与摘要重放"
+    },
+    {
+      "id": "exports",
+      "path": "chromaledger/exports.py",
+      "responsibility": "下载件投影"
+    },
+    {
+      "id": "evidence",
+      "path": "chromaledger/evidence.py",
+      "responsibility": "证据读取"
+    },
+    {
+      "id": "windows",
+      "path": "chromaledger/windows.py",
+      "responsibility": "校正窗口投影"
+    },
+    {
+      "id": "comparison",
+      "path": "chromaledger/comparison.py",
+      "responsibility": "批次差异"
+    },
+    {
+      "id": "integrity",
+      "path": "chromaledger/integrity.py",
+      "responsibility": "数据库只读完整性复算"
+    }
+  ],
+  "workflows": [
+    {
+      "id": "preview",
+      "name": "输入预检",
+      "entry": "POST preview",
+      "success": "返回摘要与核算预览",
+      "failure": "非法方法参数或非标准序列被拒绝",
+      "module_ids": [
+        "intake",
+        "sequence",
+        "method",
+        "analysis"
+      ],
+      "steps": [
+        "规范化结构",
+        "计算预览统计"
+      ],
+      "verification": "良好输入的统计和错误输入的响应"
+    },
+    {
+      "id": "ingest",
+      "name": "导入、冲突与重试",
+      "entry": "POST runs",
+      "success": "相同输入与批次 ID 复用一条记录",
+      "failure": "同 ID 输入改变返回 409",
+      "module_ids": [
+        "intake",
+        "sequence",
+        "encoding",
+        "repository"
+      ],
+      "steps": [
+        "生成输入摘要",
+        "持久化核算",
+        "核对重复提交"
+      ],
+      "verification": "摘要与单条目录记录"
+    },
+    {
+      "id": "csv",
+      "name": "序列与 CSV 峰表关联",
+      "entry": "POST preview、POST runs",
+      "success": "双文件导入与完整 JSON 的指纹相同",
+      "failure": "未知进样号与格式错误被拒绝",
+      "module_ids": [
+        "peak_csv",
+        "sequence",
+        "peaks",
+        "intake"
+      ],
+      "steps": [
+        "校验表头与关联",
+        "规范化并计算摘要"
+      ],
+      "verification": "两种来源的相同核算和未知进样错误"
+    },
+    {
+      "id": "alignment",
+      "name": "进样对齐",
+      "entry": "GET runs/<id>/injections/<injection>",
+      "success": "定位峰给出实际偏移",
+      "failure": "缺失、歧义或饱和时不能对齐",
+      "module_ids": [
+        "alignment",
+        "assignment",
+        "evidence",
+        "windows"
+      ],
+      "steps": [
+        "搜寻定位候选",
+        "计算偏移",
+        "读取证据"
+      ],
+      "verification": "单次样品偏移和失败状态"
+    },
+    {
+      "id": "assignment",
+      "name": "逐组分峰归属",
+      "entry": "GET runs/<id>",
+      "success": "清楚区分唯一峰和歧义峰",
+      "failure": "多候选不能被当成唯一峰",
+      "module_ids": [
+        "alignment",
+        "assignment",
+        "analysis",
+        "eligibility"
+      ],
+      "steps": [
+        "校正峰时间",
+        "匹配组分窗",
+        "生成原因"
+      ],
+      "verification": "组分候选与歧义状态"
+    },
+    {
+      "id": "calibration",
+      "name": "标准曲线建立",
+      "entry": "GET runs/<id>",
+      "success": "每组分返回斜率、截距和原始标准点",
+      "failure": "有效标准浓度不足以拟合时暂缓",
+      "module_ids": [
+        "sequence",
+        "assignment",
+        "calibration",
+        "analysis"
+      ],
+      "steps": [
+        "归属峰",
+        "拟合有效标准点",
+        "生成曲线证据"
+      ],
+      "verification": "系数和浓度范围"
+    },
+    {
+      "id": "blank",
+      "name": "批内空白接续",
+      "entry": "GET runs/<id>",
+      "success": "样品消费同组分最近空白",
+      "failure": "已污染组分被阻断",
+      "module_ids": [
+        "blank",
+        "analysis",
+        "assignment",
+        "eligibility"
+      ],
+      "steps": [
+        "判定空白",
+        "按序更新",
+        "记录样品引用"
+      ],
+      "verification": "污染隔离和恢复区间"
+    },
+    {
+      "id": "qc",
+      "name": "核查样的时效与量程",
+      "entry": "GET runs/<id>",
+      "success": "当前核查样关联到后续样品",
+      "failure": "高相对误差阻断交付",
+      "module_ids": [
+        "quality",
+        "quantification",
+        "analysis",
+        "eligibility"
+      ],
+      "steps": [
+        "按曲线反算",
+        "比较标称值",
+        "登记核查结果"
+      ],
+      "verification": "超差原因及后续恢复"
+    },
+    {
+      "id": "reporting",
+      "name": "样品反算与稀释",
+      "entry": "GET runs/<id>",
+      "success": "样品报告还原浓度",
+      "failure": "超量程或质控失败时报告值为空",
+      "module_ids": [
+        "quantification",
+        "eligibility",
+        "analysis",
+        "evidence"
+      ],
+      "steps": [
+        "反算样品",
+        "核对前序管控",
+        "乘稀释倍数"
+      ],
+      "verification": "3 mg/L 的实测量还原为 6 mg/L"
+    },
+    {
+      "id": "snapshot",
+      "name": "封存交付数据",
+      "entry": "POST runs/<id>/snapshot",
+      "success": "同一批次的重试复用同一封存件",
+      "failure": "全暂缓批次返回冲突",
+      "module_ids": [
+        "snapshots",
+        "repository",
+        "encoding",
+        "eligibility"
+      ],
+      "steps": [
+        "筛选交付结果",
+        "事务持久化",
+        "识别重试"
+      ],
+      "verification": "摘要复用和空交付拦截"
+    },
+    {
+      "id": "export",
+      "name": "双格式交付与重放",
+      "entry": "GET runs/<id>/snapshot.json、snapshot.csv、snapshot/replay",
+      "success": "JSON 摘要复算吻合且 CSV 峰编号一致",
+      "failure": "未封存批次不能导出",
+      "module_ids": [
+        "exports",
+        "snapshots",
+        "encoding",
+        "analysis"
+      ],
+      "steps": [
+        "读封存内容",
+        "投影 CSV",
+        "重算输入"
+      ],
+      "verification": "摘要与两个产物的峰引用"
+    },
+    {
+      "id": "compare",
+      "name": "同方法批次差异",
+      "entry": "GET runs/<id>/compare?against=<id>",
+      "success": "返回变更组分与未变数量",
+      "failure": "方法或引擎不同返回冲突",
+      "module_ids": [
+        "comparison",
+        "repository",
+        "analysis",
+        "encoding"
+      ],
+      "steps": [
+        "验证可比性",
+        "关联样品组分",
+        "提取差异"
+      ],
+      "verification": "两项稀释差异与方法冲突"
+    },
+    {
+      "id": "trace",
+      "name": "单次进样证据与工作台",
+      "entry": "GET /、GET runs/<id>/injections/<injection>",
+      "success": "原始峰编号与归属证据和窗口一致",
+      "failure": "未找到进样时返回 404",
+      "module_ids": [
+        "evidence",
+        "windows",
+        "repository",
+        "assignment"
+      ],
+      "steps": [
+        "读取输入与结果",
+        "计算证据窗口",
+        "返回工作台资源"
+      ],
+      "verification": "峰 ID、窗口偏移和静态资源响应"
+    },
+    {
+      "id": "integrity",
+      "name": "数据库只读核验",
+      "entry": "python3 -m tools.check_store <db>",
+      "success": "真实落库数据可逐项复算",
+      "failure": "封存副本被改写时返回失败",
+      "module_ids": [
+        "integrity",
+        "sequence",
+        "analysis",
+        "snapshots",
+        "encoding"
+      ],
+      "steps": [
+        "只读打开",
+        "重算摘要和结果",
+        "报告不匹配项"
+      ],
+      "verification": "完整库成功且损坏副本退出非零"
+    }
+  ],
+  "complexity": {
+    "mechanisms": [
+      "异构峰表关联",
+      "规范化输入与确定性指纹",
+      "单峰平移校正",
+      "组分窗口归属",
+      "独立最小二乘曲线",
+      "按序应用质控",
+      "量程与稀释换算",
+      "事务封存及重试复用",
+      "按样品与组分对比",
+      "独立数据库复算"
+    ]
+  }
+}

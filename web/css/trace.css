@@ -1,0 +1,50 @@
+.sequence-grid {
+  display: grid;
+  grid-template-columns: minmax(185px, 236px) minmax(0, 1fr);
+  gap: .8rem;
+  align-items: start;
+}
+.sequence-panel { padding: .85rem; }
+.sequence-panel .section-head { margin-bottom: .65rem; }
+.sequence-panel label { color: var(--muted); font-size: .79rem; white-space: nowrap; }
+.sequence-panel select { padding: .25rem; }
+#injection-list { max-height: 615px; overflow: auto; display: grid; gap: .24rem; padding: 3px; }
+.injection-row {
+  display: grid;
+  grid-template-columns: 2rem minmax(0, 1fr);
+  align-items: center;
+  gap: .45rem;
+  padding: .45rem .4rem;
+  border-color: transparent;
+  text-align: left;
+}
+.injection-row[aria-current] { border-color: #7fb4b5; background: var(--accent-pale); }
+.ordinal { padding: .25rem 0; background: #edf3f7; text-align: center; border-radius: 5px; }
+.kind-sample .ordinal { color: var(--accent); background: #eaf4f2; }
+.kind-blank .ordinal { color: #72472b; background: #faf1e6; }
+.injection-about { min-width: 0; display: grid; overflow-wrap: anywhere; }
+.injection-about strong { font-size: .89rem; }
+.injection-about small { font-size: .74rem; color: var(--muted); }
+.evidence-panel { padding: 1.15rem; }
+.trace-title { display: flex; align-items: center; justify-content: space-between; gap: .5rem; margin-bottom: .7rem; }
+.trace-title h3 { font-size: 1.36rem; overflow-wrap: anywhere; }
+.evidence-panel .facts { margin-bottom: .8rem; }
+.evidence-panel h4 { margin: .8rem 0 .4rem; }
+.chart-panel { background: #f6f9fb; border: 1px solid var(--edge); border-radius: 8px; overflow: hidden; }
+.chart-axis { display: flex; gap: .33rem; padding: .45rem .65rem .15rem; }
+.chart-button { font-size: .8rem; padding: .23rem .47rem; background: transparent; }
+.chart-button[aria-pressed="true"] { color: var(--accent-dark); background: var(--accent-pale); }
+.peak-chart { display: block; width: 100%; height: auto; }
+.raw-peaks { margin-top: 1rem; }
+.raw-peaks summary { cursor: pointer; color: var(--accent-dark); font-weight: 600; }
+.raw-peaks[open] summary { margin-bottom: .6rem; }
+
+@media (max-width: 1100px) and (min-width: 841px) {
+  .sequence-grid { grid-template-columns: minmax(0, 1fr); }
+  #injection-list { max-height: 210px; grid-template-columns: repeat(auto-fit, minmax(155px, 1fr)); }
+}
+@media (max-width: 650px) {
+  .sequence-grid { grid-template-columns: minmax(0, 1fr); }
+  #injection-list { max-height: 210px; grid-template-columns: repeat(auto-fit, minmax(145px, 1fr)); }
+  .evidence-panel { padding: .85rem; }
+}

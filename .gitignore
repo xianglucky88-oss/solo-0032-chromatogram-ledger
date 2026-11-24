@@ -1,0 +1,4 @@
+__pycache__/
+*.py[cod]
+.chromaledger/
+.DS_Store

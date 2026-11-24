@@ -1,0 +1,85 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <title>色谱批次核算台</title>
+  <link rel="stylesheet" href="/css/base.css">
+  <link rel="stylesheet" href="/css/workbench.css">
+  <link rel="stylesheet" href="/css/trace.css">
+</head>
+<body>
+  <header class="masthead">
+    <div class="brand">
+      <span class="brand-mark" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></span>
+      <div><h1>色谱批次核算台</h1><p>从进样峰表追查浓度依据</p></div>
+    </div>
+    <button id="open-intake" class="primary" type="button">导入批次</button>
+  </header>
+  <div id="notification" class="notification" role="status" aria-live="polite" hidden></div>
+  <main class="workspace">
+    <aside class="rail" aria-label="批次目录">
+      <div class="rail-heading"><h2>批次目录</h2><button id="load-example" class="quiet" type="button">打开样例</button></div>
+      <div id="catalog"></div>
+      <button id="more-runs" type="button" hidden>更多批次</button>
+    </aside>
+    <section aria-label="批次核算">
+      <div id="empty" class="empty panel">
+        <h2>开始复核一组进样</h2>
+        <p>导入包含方法、标准样、空白、核查样和待测样的 JSON，或打开合成样例。</p>
+      </div>
+      <div id="work" hidden>
+        <section class="panel batch-head" aria-label="当前批次">
+          <div><p id="batch-id" class="identifier"></p><h2 id="batch-title"></h2><p id="batch-method" class="detail"></p></div>
+          <div id="batch-summary" class="summary"></div>
+        </section>
+        <div class="tabs" role="tablist" aria-label="批次视图">
+          <button id="tab-sequence" type="button" role="tab" aria-selected="true" aria-controls="sequence" data-panel="sequence">进样序列</button>
+          <button id="tab-curves" type="button" role="tab" aria-selected="false" tabindex="-1" aria-controls="curves" data-panel="curves">标准曲线</button>
+          <button id="tab-controls" type="button" role="tab" aria-selected="false" tabindex="-1" aria-controls="controls" data-panel="controls">质控时间线</button>
+          <button id="tab-delivery" type="button" role="tab" aria-selected="false" tabindex="-1" aria-controls="delivery" data-panel="delivery">交付与对比</button>
+        </div>
+        <section id="sequence" role="tabpanel" aria-labelledby="tab-sequence">
+          <div class="sequence-grid">
+            <section class="panel sequence-panel" aria-label="进样选择">
+              <div class="section-head"><h3>进样序列</h3><label>类型 <select id="kind-filter"><option value="all">全部</option><option value="sample">待测样</option><option value="standard">标准样</option><option value="blank">空白</option><option value="qc">核查样</option></select></label></div>
+              <div id="injection-list"></div>
+            </section>
+            <section class="panel evidence-panel" aria-label="进样证据">
+              <div id="injection-trace" aria-live="polite"></div>
+            </section>
+          </div>
+        </section>
+        <section id="curves" role="tabpanel" aria-labelledby="tab-curves" hidden></section>
+        <section id="controls" role="tabpanel" aria-labelledby="tab-controls" hidden></section>
+        <section id="delivery" role="tabpanel" aria-labelledby="tab-delivery" hidden>
+          <section class="panel delivery-panel">
+            <div class="section-head"><h3>交付快照</h3><button id="freeze" type="button" class="primary">封存结果</button></div>
+            <div id="snapshot"></div>
+          </section>
+          <section class="panel delivery-panel">
+            <div class="section-head"><h3>样品结果对比</h3></div>
+            <form id="compare-form" class="compare-form">
+              <label for="compare-id">对比批次编号</label><input id="compare-id" required maxlength="48" autocomplete="off">
+              <button type="submit">对比</button>
+            </form>
+            <div id="compare-result" aria-live="polite"></div>
+          </section>
+        </section>
+      </div>
+    </section>
+  </main>
+  <dialog id="intake" aria-labelledby="intake-title">
+    <form id="intake-form">
+      <div class="section-head"><h2 id="intake-title">导入峰表批次</h2><button id="close-intake" type="button" class="quiet">关闭</button></div>
+      <label class="file-label">选择 JSON 文件 <input id="upload" type="file" accept=".json,application/json" required></label>
+      <label class="file-label">峰表 CSV（选填） <input id="peak-upload" type="file" accept=".csv,text/csv"></label>
+      <p class="detail">可上传完整 JSON，也可搭配 CSV 上传不含峰的序列 JSON。导入包上限为 2 MB。</p>
+      <div id="intake-result" role="status" aria-live="polite"></div>
+      <div class="dialog-actions"><button id="preview" type="button">预检</button><button id="commit" type="submit" class="primary" disabled>确认导入</button></div>
+    </form>
+  </dialog>
+  <script type="module" src="/js/app.js"></script>
+</body>
+</html>

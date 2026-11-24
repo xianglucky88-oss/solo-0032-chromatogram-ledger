@@ -1,0 +1,70 @@
+{
+  "project_shape": "fullstack",
+  "language": "Python 3.11+ / ECMAScript modules",
+  "source_extensions": [
+    ".py",
+    ".html",
+    ".css",
+    ".js"
+  ],
+  "build_command": "python3 tools/buildcheck.py",
+  "testing": "deferred",
+  "workflow_checks": [
+    {
+      "workflow_id": "preview",
+      "command": "python3 tools/smoke.py preview"
+    },
+    {
+      "workflow_id": "ingest",
+      "command": "python3 tools/smoke.py ingest"
+    },
+    {
+      "workflow_id": "csv",
+      "command": "python3 tools/smoke.py csv"
+    },
+    {
+      "workflow_id": "alignment",
+      "command": "python3 tools/smoke.py alignment"
+    },
+    {
+      "workflow_id": "assignment",
+      "command": "python3 tools/smoke.py assignment"
+    },
+    {
+      "workflow_id": "calibration",
+      "command": "python3 tools/smoke.py calibration"
+    },
+    {
+      "workflow_id": "blank",
+      "command": "python3 tools/smoke.py blank"
+    },
+    {
+      "workflow_id": "qc",
+      "command": "python3 tools/smoke.py qc"
+    },
+    {
+      "workflow_id": "reporting",
+      "command": "python3 tools/smoke.py reporting"
+    },
+    {
+      "workflow_id": "snapshot",
+      "command": "python3 tools/smoke.py snapshot"
+    },
+    {
+      "workflow_id": "export",
+      "command": "python3 tools/smoke.py export"
+    },
+    {
+      "workflow_id": "compare",
+      "command": "python3 tools/smoke.py compare"
+    },
+    {
+      "workflow_id": "trace",
+      "command": "python3 tools/smoke.py trace"
+    },
+    {
+      "workflow_id": "integrity",
+      "command": "python3 tools/smoke.py integrity"
+    }
+  ]
+}
