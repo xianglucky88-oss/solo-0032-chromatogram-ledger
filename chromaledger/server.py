@@ -7,6 +7,7 @@ import re
 import sqlite3
 from urllib.parse import urlsplit
 
+from .archive_database import initialize as initialize_archive
 from .database import initialize
 from .errors import Rejected
 from .routes import API, BASE, Response, dispatch, json_response
@@ -18,8 +19,9 @@ LOGGER = logging.getLogger(__name__)
 
 
 class WorkbenchServer(ThreadingHTTPServer):
-    def __init__(self, address, database):
+    def __init__(self, address, database, archive_database):
         self.database = database
+        self.archive_database = archive_database
         super().__init__(address, Handler)
 
 
@@ -60,7 +62,8 @@ class Handler(BaseHTTPRequestHandler):
             except ValueError as exc:
                 raise Rejected('invalid_path', '请求路径无效。', status=400) from exc
             if request.path.startswith(API):
-                result = dispatch(self.server.database, self.command, request.path, request.query, self.read_payload)
+                result = dispatch(self.server.database, self.command, request.path, request.query,
+                                  self.read_payload, self.server.archive_database)
             elif self.command == 'GET':
                 result = self.static(request.path)
             else:
@@ -96,11 +99,14 @@ class Handler(BaseHTTPRequestHandler):
 def main():
     parser = argparse.ArgumentParser(description='启动色谱批次核算台')
     parser.add_argument('--db', type=Path, default=Path('.chromaledger/batches.sqlite3'))
+    parser.add_argument('--archive-db', type=Path, default=Path('.chromaledger/archive.sqlite3'))
     parser.add_argument('--port', type=int, default=8773)
     args = parser.parse_args()
     args.db.parent.mkdir(parents=True, exist_ok=True)
+    args.archive_db.parent.mkdir(parents=True, exist_ok=True)
     initialize(args.db)
-    with WorkbenchServer(('127.0.0.1', args.port), args.db) as server:
+    initialize_archive(args.archive_db)
+    with WorkbenchServer(('127.0.0.1', args.port), args.db, args.archive_db) as server:
         print(f'色谱批次核算台运行于 http://127.0.0.1:{server.server_port}', flush=True)
         try:
             server.serve_forever()

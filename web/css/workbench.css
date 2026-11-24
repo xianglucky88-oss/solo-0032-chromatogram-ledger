@@ -26,6 +26,8 @@
 .brand-mark i:nth-child(4) { height: 23px; background: #f4ac86; }
 .brand-mark i:nth-child(5) { height: 12px; }
 .masthead button { white-space: nowrap; background: #16717a; }
+.masthead-actions { display: flex; gap: .6rem; align-items: center; }
+.masthead .quiet { color: #cfe4e6; }
 .workspace {
   width: min(100%, 1600px);
   margin: auto;
@@ -103,4 +105,14 @@ dialog::backdrop { background: #102835a0; }
 @media (max-width: 480px) {
   .tabs { overflow: auto; }
   .tabs button { white-space: nowrap; }
+}
+.archive-workspace { width: min(100%, 1600px); }
+.archive-layout { display: grid; grid-template-columns: minmax(240px, 320px) minmax(0, 1fr); gap: 1.15rem; align-items: start; }
+.archive-records-panel { padding: .85rem; }
+.archive-records-panel #archive-records { display: grid; gap: .55rem; max-height: 72vh; overflow: auto; padding: 3px; }
+.archive-detail { display: grid; gap: .8rem; min-width: 0; }
+.archive-detail .batch-head { padding: 1.1rem 1.3rem; }
+@media (max-width: 840px) {
+  .archive-layout { grid-template-columns: minmax(0, 1fr); }
+  .archive-records-panel #archive-records { max-height: 32vh; grid-auto-flow: column; grid-auto-columns: minmax(200px, 260px); }
 }

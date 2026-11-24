@@ -12,59 +12,63 @@
   "workflow_checks": [
     {
       "workflow_id": "preview",
-      "command": "python3 tools/smoke.py preview"
+      "command": "python3 -m tools.smoke preview"
     },
     {
       "workflow_id": "ingest",
-      "command": "python3 tools/smoke.py ingest"
+      "command": "python3 -m tools.smoke ingest"
     },
     {
       "workflow_id": "csv",
-      "command": "python3 tools/smoke.py csv"
+      "command": "python3 -m tools.smoke csv"
     },
     {
       "workflow_id": "alignment",
-      "command": "python3 tools/smoke.py alignment"
+      "command": "python3 -m tools.smoke alignment"
     },
     {
       "workflow_id": "assignment",
-      "command": "python3 tools/smoke.py assignment"
+      "command": "python3 -m tools.smoke assignment"
     },
     {
       "workflow_id": "calibration",
-      "command": "python3 tools/smoke.py calibration"
+      "command": "python3 -m tools.smoke calibration"
     },
     {
       "workflow_id": "blank",
-      "command": "python3 tools/smoke.py blank"
+      "command": "python3 -m tools.smoke blank"
     },
     {
       "workflow_id": "qc",
-      "command": "python3 tools/smoke.py qc"
+      "command": "python3 -m tools.smoke qc"
     },
     {
       "workflow_id": "reporting",
-      "command": "python3 tools/smoke.py reporting"
+      "command": "python3 -m tools.smoke reporting"
     },
     {
       "workflow_id": "snapshot",
-      "command": "python3 tools/smoke.py snapshot"
+      "command": "python3 -m tools.smoke snapshot"
     },
     {
       "workflow_id": "export",
-      "command": "python3 tools/smoke.py export"
+      "command": "python3 -m tools.smoke export"
     },
     {
       "workflow_id": "compare",
-      "command": "python3 tools/smoke.py compare"
+      "command": "python3 -m tools.smoke compare"
     },
     {
       "workflow_id": "trace",
-      "command": "python3 tools/smoke.py trace"
+      "command": "python3 -m tools.smoke trace"
     },
     {
       "workflow_id": "integrity",
-      "command": "python3 tools/smoke.py integrity"
+      "command": "python3 -m tools.smoke integrity"
+    },
+    {
+      "workflow_id": "archive",
+      "command": "python3 -m tools.smoke archive"
     }
   ]
 }

@@ -1,4 +1,5 @@
 import {api} from './api.js';
+import {bindArchive} from './archive.js';
 import {catalogView} from './catalog.js';
 import {renderControls} from './controls.js';
 import {renderCurves} from './curves.js';
@@ -89,6 +90,16 @@ async function imported(result) {
 }
 
 bindIntake(imported);
+const archive = bindArchive(notify);
+byId('open-archive').addEventListener('click', async () => {
+  byId('archive-view').hidden = false;
+  document.querySelector('main.workspace:not(#archive-view)').hidden = true;
+  await archive.show();
+});
+byId('close-archive').addEventListener('click', () => {
+  archive.hide();
+  document.querySelector('main.workspace:not(#archive-view)').hidden = false;
+});
 filter.addEventListener('change', () => {
   if (!current) return;
   const matches = current.injections.filter(row => filter.value === 'all' || row.kind === filter.value);

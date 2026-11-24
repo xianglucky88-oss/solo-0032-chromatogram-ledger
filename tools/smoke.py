@@ -15,6 +15,15 @@ from tempfile import TemporaryDirectory
 from urllib.error import HTTPError
 from urllib.request import Request, urlopen
 
+from chromaledger.archive_database import initialize as initialize_archive
+from chromaledger.archive_intake import receive_backup
+from chromaledger.database import connect as open_store, initialize
+from chromaledger.encoding import digest
+from chromaledger.errors import Rejected
+from chromaledger.integrity import inspect_archive
+from chromaledger.intake import ingest
+from chromaledger.snapshots import freeze
+
 PREFIX = '/chromaledger/api/'
 EXAMPLES = Path('examples')
 
@@ -45,9 +54,10 @@ class Client:
 
 
 class Example:
-    def __init__(self, client, database):
+    def __init__(self, client, database, archive_database):
         self.client = client
         self.database = database
+        self.archive_database = archive_database
         self.document = client.api('example')
         self.run = 'runs/' + self.document['id']
         self.inserted = client.api('runs', self.document, status=201)
@@ -213,6 +223,165 @@ def run_store_verification(path):
     return process.returncode, json.loads(process.stdout)
 
 
+def checkpoint(path):
+    conn = sqlite3.connect(path)
+    try:
+        conn.execute('PRAGMA wal_checkpoint(TRUNCATE)')
+    finally:
+        conn.close()
+
+
+def make_workstation_backup(scratch, name, batches, sealed=()):
+    """Build a workstation-style SQLite backup with the real intake pipeline."""
+    path = Path(scratch) / name
+    initialize(path)
+    for document in batches:
+        with open_store(path) as conn:
+            ingest(conn, document)
+    for batch_id in sealed:
+        with open_store(path) as conn:
+            freeze(conn, batch_id)
+    checkpoint(path)
+    return path
+
+
+def variant(document, batch_id, *, dilution=None, label_suffix=''):
+    copy = deepcopy(document)
+    copy['id'] = batch_id
+    if label_suffix:
+        copy['label'] = f'{copy["label"]} {label_suffix}'
+    if dilution is not None:
+        next(row for row in copy['injections'] if row['id'] == 'S-01')['dilution'] = dilution
+    return copy
+
+
+def check_archive(example):
+    client = example.client
+    archive_db = Path(example.archive_database)
+    with TemporaryDirectory(prefix='chromaledger-archive-') as scratch:
+        b07 = variant(example.document, 'B07', label_suffix='东')
+        west_b07 = variant(example.document, 'B07', dilution=3, label_suffix='西')
+        b08 = variant(example.document, 'B08', label_suffix='东')
+        b09 = variant(example.document, 'B09', label_suffix='东')
+
+        east_first = make_workstation_backup(scratch, 'east-first.sqlite3', [b07])
+        west_first = make_workstation_backup(scratch, 'west-first.sqlite3', [west_b07], sealed=['B07'])
+        east_second = make_workstation_backup(
+            scratch, 'east-second.sqlite3', [b07, b08], sealed=['B07'])
+
+        first = receive_backup(archive_db, 'east', east_first)
+        require(not first['reused'] and first['added_batches'] == ['B07']
+                and first['completed_seals'] == [], '东站首份未封存备份入档结果错误')
+        west = receive_backup(archive_db, 'west', west_first)
+        require(west['added_batches'] == ['B07'] and west['completed_seals'] == ['B07'],
+                '西站已封存 B07 应直接入档封存')
+        # 同号批次在不同工作站下各自成记录，输入与封存摘要不同也不冲突
+        catalog = client.api('archive/runs')
+        require({(item['station_id'], item['batch_id']) for item in catalog['items']}
+                >= {('east', 'B07'), ('west', 'B07')}, '归档目录未按工作站区分同号批次')
+
+        second = receive_backup(archive_db, 'east', east_second)
+        require(second['added_batches'] == ['B08'] and second['completed_seals'] == ['B07'],
+                '晚到备份应补齐东站 B07 封存并只新增 B08')
+        # 较早副本晚到不得撤掉已收封存或丢掉其他批次
+        again = receive_backup(archive_db, 'east', east_first)
+        require(again['reused'] and again['added_batches'] == [] and again['completed_seals'] == [],
+                '原样重交应识别为同一份收件且不改动档案')
+        east_view = client.api('archive/stations/east')
+        require(east_view['batch_count'] == 2 and east_view['snapshot_count'] == 1,
+                '重交早期副本不应撤掉封存或其他批次')
+
+        # 两站 B07 均可下载原样封存件并复算原摘要
+        for station in ('east', 'west'):
+            replay = client.api(f'archive/stations/{station}/runs/B07/snapshot/replay')
+            require(replay['matches'], f'{station} B07 封存摘要复算不一致')
+            artifact = client.request(PREFIX + f'archive/stations/{station}/runs/B07/snapshot.json')
+            require(hashlib.sha256(artifact).hexdigest() == replay['stored_sha256'],
+                    f'{station} B07 下载件不是原样封存件')
+            report = client.api(f'archive/stations/{station}/runs/B07')
+            require(report['input_hash'] == replay['input_sha256'], f'{station} B07 输入摘要不一致')
+        client.request(PREFIX + 'archive/stations/west/runs/B07/snapshot.csv')
+
+        # 第三站提交与西站完全相同的输入及封存：分别可查且原摘要相同
+        north_backup = make_workstation_backup(
+            scratch, 'north-first.sqlite3', [variant(west_b07, 'B07')], sealed=['B07'])
+        north = receive_backup(archive_db, 'north', north_backup)
+        require(north['added_batches'] == ['B07'], '第三站相同内容应独立入档')
+        west_report = client.api('archive/stations/west/runs/B07')
+        north_report = client.api('archive/stations/north/runs/B07')
+        require(west_report['input_hash'] == north_report['input_hash']
+                and west_report['snapshot']['hash'] == north_report['snapshot']['hash'],
+                '相同输入与封存的两站记录摘要应一致')
+        stations = {row['station_id']: row for row in client.api('archive/stations')['items']}
+        require(set(stations) == {'east', 'west', 'north'}, '总台目录应能分清来源工作站')
+
+        # 输入发生变化的 B07 与新批次 B09 同份到达：整份拒收，B09 不得落地
+        changed_b07 = variant(b07, 'B07', dilution=4)
+        input_conflict = make_workstation_backup(
+            scratch, 'east-input-conflict.sqlite3', [changed_b07, b09])
+        try:
+            receive_backup(archive_db, 'east', input_conflict)
+            raise RuntimeError('同站同号输入变化必须作为冲突整份拒收')
+        except Rejected as exc:
+            require(exc.code == 'archive_input_conflict' and exc.status == 409, '输入冲突的错误类型不对')
+        require(all(item['batch_id'] != 'B09' for item in client.api('archive/runs?station=east')['items']),
+                '拒收的备份不得让 B09 出现在目录')
+
+        # B09 封存被改结果后重算文件摘要：核验失败，整份拒收，B09 仍不得入档
+        tampered = make_workstation_backup(scratch, 'east-tamper.sqlite3', [b09], sealed=['B09'])
+        raw = sqlite3.connect(tampered)
+        try:
+            content = json.loads(raw.execute("SELECT content FROM snapshots WHERE run_id = 'B09'").fetchone()[0])
+            content['results'][0]['concentration'] = 999
+            new_content = json.dumps(content, ensure_ascii=False, separators=(',', ':'), sort_keys=True)
+            with raw:
+                raw.execute("UPDATE snapshots SET content = ?, hash = ? WHERE run_id = 'B09'",
+                            (new_content, digest(new_content)))
+        finally:
+            raw.close()
+        checkpoint(tampered)
+        try:
+            receive_backup(archive_db, 'east', tampered)
+            raise RuntimeError('仅内部摘要自洽但无法由原输入核回的封存必须拒收')
+        except Rejected as exc:
+            require(exc.code == 'backup_verification_failed', '封存核验失败的错误类型不对')
+        require(all(item['batch_id'] != 'B09' for item in client.api('archive/runs?station=east')['items']),
+                '核验失败后 B09 仍不得入档')
+
+        # 按来源打开原输入、报告与进样证据
+        source = client.api('archive/stations/east/runs/B08/source')
+        require(source['id'] == 'B08' and source['injections'], '无法按来源打开归档原输入')
+        trace = client.api('archive/stations/east/runs/B08/injections/S-01')
+        require(trace['source']['id'] == 'S-01' and trace['result']['decisions'], '无法读取归档进样证据')
+        receipts = client.api('archive/stations/east/receipts')
+        require(len(receipts['items']) == 2, '每份不同的备份都应留下一条收件记录')
+        require({tuple(row['batch_ids']) for row in receipts['items']} == {('B07',), ('B07', 'B08')},
+                '收件记录应保留各备份的批次清单')
+
+        # 源备份移走后，总台自己的目录中的读取、下载和复算仍能完成
+        relocated = Path(scratch) / 'moved'
+        relocated.mkdir()
+        for backup in Path(scratch).glob('*.sqlite3*'):
+            backup.rename(relocated / backup.name)
+        replay = client.api('archive/stations/east/runs/B07/snapshot/replay')
+        require(replay['matches'], '源备份移走后封存复算失败')
+        artifact = client.request(PREFIX + 'archive/stations/east/runs/B07/snapshot.json')
+        require(hashlib.sha256(artifact).hexdigest() == replay['stored_sha256'],
+                '源备份移走后无法下载原样封存件')
+        require(client.api('archive/stations/west/runs/B07/source')['id'] == 'B07',
+                '源备份移走后无法打开原输入')
+
+        intact = inspect_archive(archive_db)
+        require(intact['ok'] and intact['runs'] == 4 and intact['snapshots'] == 3
+                and intact['stations'] == 3, '归档库只读完整性核验失败')
+        code, cli = run_archive_cli(archive_db, 'east', relocated / 'east-first.sqlite3')
+        require(code == 0 and cli['ok'] and cli['reused'], '命令行收件无法识别原样重交')
+        # 未参加归档接收的本机批次仍走原来的批次号入口
+        require(client.api('runs')['items'], '本机批次目录不应被归档接收改动')
+        client.api('archive/stations/unknown', status=404)
+        client.api('archive/stations/east/runs/B09', status=404)
+
+
 def check_integrity(example):
     if not example.client.api(example.run)['snapshot']:
         example.client.api(example.run + '/snapshot', {}, status=201)
@@ -234,16 +403,29 @@ def check_integrity(example):
     require(run_store_verification(example.database)[0] == 0, '核验扰动了原始数据库')
 
 
+def run_archive_cli(archive_db, station_id, backup):
+    process = subprocess.run(
+        [sys.executable, '-m', 'tools.intake_archive', station_id, str(backup),
+         '--archive-db', str(archive_db)],
+        capture_output=True, text=True, timeout=15,
+    )
+    return process.returncode, json.loads(process.stdout)
+
+
 CHECKS = {fn.__name__.removeprefix('check_'): fn for fn in (
     check_preview, check_ingest, check_csv, check_alignment, check_assignment, check_calibration,
-    check_blank, check_qc, check_reporting, check_snapshot, check_export, check_compare, check_trace, check_integrity,
+    check_blank, check_qc, check_reporting, check_snapshot, check_export, check_compare, check_trace,
+    check_integrity, check_archive,
 )}
 
 
 def run_workflows(selection):
     with TemporaryDirectory(prefix='chromaledger-check-') as scratch:
         db = str(Path(scratch) / 'smoke.sqlite3')
-        command = [sys.executable, '-m', 'chromaledger', '--db', db, '--port', '0']
+        archive_db = str(Path(scratch) / 'archive.sqlite3')
+        initialize_archive(archive_db)
+        command = [sys.executable, '-m', 'chromaledger', '--db', db,
+                   '--archive-db', archive_db, '--port', '0']
         with TemporaryDirectory(prefix='chromaledger-log-') as logs, (Path(logs) / 'server.log').open('w+') as log:
             with subprocess.Popen(command, stdout=subprocess.PIPE, stderr=log, text=True) as process:
                 try:
@@ -254,7 +436,7 @@ def run_workflows(selection):
                     require(url and url[0].startswith('http://127.0.0.1:'), '服务器启动失败')
                     client = Client(url[0])
                     require(client.api('health')['status'] == 'ready', '数据库未就绪')
-                    example = Example(client, db)
+                    example = Example(client, db, archive_db)
                     for workflow in selection:
                         CHECKS[workflow](example)
                         print(f'通过 {workflow}')

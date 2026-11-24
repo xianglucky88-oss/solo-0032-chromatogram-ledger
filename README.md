@@ -21,12 +21,25 @@ python3 -m chromaledger
 
 演示样例含 13 次进样、2 个组分、4 项可交付结果和 4 项暂缓结果。S-01 的组分甲实测为 3 mg/L，按两倍稀释还原后为 6 mg/L。规范化输入、进样证据和封存件均可通过本机 API 读取，接口见 [产品规格](PROJECT_SPEC.md)。
 
+## 工作站归档接收
+
+离线工作站日终交出各自的 SQLite 备份，总台用独立的归档库（默认 `.chromaledger/archive.sqlite3`，可用 `--archive-db` 指定）接收。一条归档记录由收件时确认的固定工作站标识与原批次号共同认定，两个工作站可以各自拥有同号批次。
+
+```sh
+python3 -m tools.intake_archive east /path/to/east-backup.sqlite3
+```
+
+每份备份作为一次收件：备份以只读方式打开，总台从该站的原输入重算输入摘要、报告和封存件，再与备份内文件核对；仅内部摘要自洽但无法由原输入核回的文件不能入档。任一核验失败或与该站已收资料冲突（同号输入变化、已入档封存出现不同内容），整份收件拒收，库中不留任何内容。原样重交按备份字节摘要识别为同一收件；较早副本晚到不会撤掉已收封存或其他批次，旧备份未封存而后续备份已封存的同号批次会补齐封存。
+
+浏览器中点击页头「工作站归档」可按来源查看收档记录、打开原输入与进样证据、下载原样封存件并复算原摘要。所有归档资料保存在总台自己的库中，源备份移走后这些操作仍然可用。没有参加归档接收的本机批次仍使用原批次目录和封存流程。
+
 ## 验证
 
 ```sh
 python3 tools/buildcheck.py
-python3 tools/smoke.py
+python3 -m tools.smoke
 python3 -m tools.check_store .chromaledger/batches.sqlite3
+python3 -m tools.check_store .chromaledger/archive.sqlite3 --archive
 ```
 
 语法检查还需要 Node.js 18 或更新版本。冒烟脚本启动独立的本机临时服务和 SQLite 文件，从公开入口检查真实产品操作。数据库核验命令以只读方式检查结构、外键、输入摘要、核算结果与封存件。系统化测试套件留待后续补充。

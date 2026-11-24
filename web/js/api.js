@@ -13,6 +13,7 @@ async function request(path, value) {
 }
 
 const run = id => `runs/${encodeURIComponent(id)}`;
+const archive = (station, id) => `archive/stations/${encodeURIComponent(station)}/runs/${encodeURIComponent(id)}`;
 export const api = {
   example: () => request('example'),
   catalog: (offset = 0) => request(`runs?offset=${offset}`),
@@ -24,4 +25,15 @@ export const api = {
   freeze: id => request(`${run(id)}/snapshot`, {}),
   replay: id => request(`${run(id)}/snapshot/replay`),
   download: (id, kind) => `${prefix}${run(id)}/snapshot.${kind}`,
+  archiveStations: () => request('archive/stations'),
+  archiveStation: station => request(`archive/stations/${encodeURIComponent(station)}`),
+  archiveReceipts: station => request(`archive/stations/${encodeURIComponent(station)}/receipts`),
+  archiveCatalog: (station = null, offset = 0) =>
+    request(`archive/runs?offset=${offset}${station ? `&station=${encodeURIComponent(station)}` : ''}`),
+  archiveOpen: (station, id) => request(archive(station, id)),
+  archiveSource: (station, id) => request(`${archive(station, id)}/source`),
+  archiveTrace: (station, id, injection) =>
+    request(`${archive(station, id)}/injections/${encodeURIComponent(injection)}`),
+  archiveReplay: (station, id) => request(`${archive(station, id)}/snapshot/replay`),
+  archiveDownload: (station, id, kind) => `${prefix}${archive(station, id)}/snapshot.${kind}`,
 };

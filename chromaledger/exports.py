@@ -2,17 +2,29 @@ import csv
 import io
 import json
 
+from .archive_views import get_archive_snapshot
 from .snapshots import get_snapshot
 
 CSV_FIELDS = ('sample_id', 'injection_id', 'order', 'target_id', 'concentration', 'dilution', 'peak_id', 'blank_id', 'qc_id')
+
+
+def render_snapshot(snapshot):
+    output = io.StringIO(newline='')
+    writer = csv.DictWriter(output, CSV_FIELDS, lineterminator='\r\n')
+    writer.writeheader()
+    writer.writerows(json.loads(snapshot['content'])['results'])
+    return output.getvalue().encode('utf-8'), 'text/csv; charset=utf-8'
 
 
 def export_snapshot(conn, run_id, form):
     snapshot = get_snapshot(conn, run_id)
     if form == 'json':
         return snapshot['content'].encode('utf-8'), 'application/json'
-    output = io.StringIO(newline='')
-    writer = csv.DictWriter(output, CSV_FIELDS, lineterminator='\r\n')
-    writer.writeheader()
-    writer.writerows(json.loads(snapshot['content'])['results'])
-    return output.getvalue().encode('utf-8'), 'text/csv; charset=utf-8'
+    return render_snapshot(snapshot)
+
+
+def export_archive_snapshot(conn, station_id, batch_id, form):
+    snapshot = get_archive_snapshot(conn, station_id, batch_id)
+    if form == 'json':
+        return snapshot['content'].encode('utf-8'), 'application/json'
+    return render_snapshot(snapshot)

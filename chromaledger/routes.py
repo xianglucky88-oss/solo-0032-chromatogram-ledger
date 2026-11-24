@@ -14,6 +14,7 @@ from .repository import catalog, find_run
 from .snapshots import freeze, replay
 
 API = '/chromaledger/api/'
+ARCHIVE_ROUTE = 'archive/'
 BASE = Path(__file__).resolve().parent.parent
 RUN_ID = r'([A-Za-z0-9][A-Za-z0-9_.-]{0,47})'
 RUN_PATH = re.compile(rf'runs/{RUN_ID}(?:/(.*))?\Z')
@@ -74,8 +75,13 @@ def run_route(conn, method, run_id, action, query):
     raise Rejected('not_found', '没有该接口。', status=404)
 
 
-def dispatch(db, method, path, query, read_body):
+def dispatch(db, method, path, query, read_body, archive_db=None):
     route = path[len(API):]
+    if route.startswith(ARCHIVE_ROUTE):
+        if archive_db is None:
+            raise Rejected('archive_unavailable', '总台未配置工作站归档库。', status=404)
+        from .archive_routes import dispatch_archive
+        return dispatch_archive(archive_db, method, route, query)
     if method == 'GET':
         if route == 'health':
             with connect(db) as conn:

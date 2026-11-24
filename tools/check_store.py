@@ -4,15 +4,16 @@ import json
 from pathlib import Path
 import sqlite3
 
-from chromaledger.integrity import inspect_database
+from chromaledger.integrity import inspect_archive, inspect_database
 
 
 def main():
     parser = argparse.ArgumentParser(description='只读核验本地数据库、核算结果及封存件')
     parser.add_argument('database', type=Path)
+    parser.add_argument('--archive', action='store_true', help='按总台工作站归档库核验')
     args = parser.parse_args()
     try:
-        report = inspect_database(args.database)
+        report = inspect_archive(args.database) if args.archive else inspect_database(args.database)
     except sqlite3.Error as exc:
         report = {'ok': False, 'error': 'database_unavailable', 'detail': str(exc)}
     print(json.dumps(report, ensure_ascii=False, indent=2))

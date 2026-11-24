@@ -111,6 +111,31 @@
       "id": "integrity",
       "path": "chromaledger/integrity.py",
       "responsibility": "数据库只读完整性复算"
+    },
+    {
+      "id": "archive_database",
+      "path": "chromaledger/archive_database.py",
+      "responsibility": "工作站归档库结构"
+    },
+    {
+      "id": "archive_verify",
+      "path": "chromaledger/archive_verify.py",
+      "responsibility": "备份只读核验与原输入复算"
+    },
+    {
+      "id": "archive_intake",
+      "path": "chromaledger/archive_intake.py",
+      "responsibility": "整份备份的事务收件与冲突处理"
+    },
+    {
+      "id": "archive_views",
+      "path": "chromaledger/archive_views.py",
+      "responsibility": "归档记录读模型与摘要重放"
+    },
+    {
+      "id": "archive_routes",
+      "path": "chromaledger/archive_routes.py",
+      "responsibility": "工作站归档只读 HTTP 接口"
     }
   ],
   "workflows": [
@@ -378,6 +403,28 @@
         "报告不匹配项"
       ],
       "verification": "完整库成功且损坏副本退出非零"
+    },
+    {
+      "id": "archive",
+      "name": "工作站归档接收",
+      "entry": "python3 -m tools.intake_archive、GET archive/...",
+      "success": "按工作站与原批次号独立入档，晚到副本补齐封存且原样重交幂等",
+      "failure": "核验失败、输入变化或封存冲突时整份收件拒收",
+      "module_ids": [
+        "archive_database",
+        "archive_verify",
+        "archive_intake",
+        "archive_views",
+        "archive_routes",
+        "integrity"
+      ],
+      "steps": [
+        "只读打开备份并从原输入复算报告与封存",
+        "单事务检查冲突并补齐入档",
+        "按来源读取、下载与重放",
+        "只读核验归档库"
+      ],
+      "verification": "东西北三站同号批次、补齐封存、两类冲突与源备份移走"
     }
   ],
   "complexity": {
@@ -391,7 +438,11 @@
       "量程与稀释换算",
       "事务封存及重试复用",
       "按样品与组分对比",
-      "独立数据库复算"
+      "独立数据库复算",
+      "工作站备份只读核验",
+      "按工作站标识与批次号的复合归档身份",
+      "整份收件事务与冲突拒收",
+      "归档原件下载与摘要重放"
     ]
   }
 }

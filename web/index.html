@@ -15,7 +15,10 @@
       <span class="brand-mark" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></span>
       <div><h1>色谱批次核算台</h1><p>从进样峰表追查浓度依据</p></div>
     </div>
-    <button id="open-intake" class="primary" type="button">导入批次</button>
+    <div class="masthead-actions">
+      <button id="open-archive" class="quiet" type="button">工作站归档</button>
+      <button id="open-intake" class="primary" type="button">导入批次</button>
+    </div>
   </header>
   <div id="notification" class="notification" role="status" aria-live="polite" hidden></div>
   <main class="workspace">
@@ -67,6 +70,21 @@
             <div id="compare-result" aria-live="polite"></div>
           </section>
         </section>
+      </div>
+    </section>
+  </main>
+  <main id="archive-view" class="workspace archive-workspace" hidden>
+    <aside class="rail" aria-label="工作站来源">
+      <div class="rail-heading"><h2>工作站</h2><button id="close-archive" class="quiet" type="button">返回本机批次</button></div>
+      <div id="archive-stations"></div>
+    </aside>
+    <section aria-label="归档批次">
+      <div class="archive-layout">
+        <section class="panel archive-records-panel" aria-label="收档记录">
+          <div class="section-head"><h3>收档记录</h3></div>
+          <div id="archive-records"></div>
+        </section>
+        <div id="archive-detail" class="archive-detail"></div>
       </div>
     </section>
   </main>
