@@ -15,13 +15,13 @@
 3. 对每个组分分别建立带截距的一次最小二乘曲线，至少三个不同浓度水平。只有唯一且未饱和的匹配峰参与拟合。拟合必须满足正斜率和方法规定的 R²，标样浓度范围作为定量范围。
 4. 对每个组分独立跟踪当前进样之前最近的空白与核查样。对应的证据不合格或缺失会阻止该组分的交付。序列后续证据只影响后续进样。
 5. 样品组分反算浓度，检验量程，应用稀释倍数。样品同次进样内的组分可分别处于可交付或暂缓状态。进样证据包含窗口、候选峰以及判定引用的前序空白与核查样编号。批次报告同时提供标准曲线和全部进样的核算结果。
-6. 封存以事务持久化确定性的 JSON 与摘要。重复封存返回已有记录。CSV 与 JSON 都由同一冻结内容导出，仅包含可交付组分。有相同方法正文及引擎版本的两批结果可以按样品、进样与组分比较。
+6. 封存以事务持久化确定性的 JSON 与摘要。重复封存返回已有记录。CSV 与 JSON 都由同一冻结内容导出，仅包含可交付组分。封存的同时按样品签发分样交付：每个有可交付组分的样品得到一份只含本样品冻结行的交付件，以及一份记录交付件摘要的封存凭据，两者随封存在同一事务持久化，重试或重启后取回原凭据。没有可交付行的样品不签发，空件不得被验成有效交付。早于该机制的封存件不补签凭据，仍走原下载与复算流程。有相同方法正文及引擎版本的两批结果可以按样品、进样与组分比较。
 
 ## 代码边界
 
 - `chromaledger/sequence.py`、`method.py`、`peaks.py` 分别解释进样序列、方法与单次进样峰表。`peak_csv.py` 处理异构输入关联，`intake.py` 调用规范化和入库。
 - `alignment.py` 与 `assignment.py` 实现定位和归属。`calibration.py` 拟合曲线。`blank.py`、`quality.py` 与 `eligibility.py` 分别执行空白、核查和样品规则，`analysis.py` 编排有序数据流。
-- `repository.py` 提供记录访问，`snapshots.py` 持久化封存，`exports.py` 生成下载件，`evidence.py` 提供证据读模型。`integrity.py` 从只读连接独立重算数据库中记录的批次和封存件。
+- `repository.py` 提供记录访问，`snapshots.py` 持久化封存，`deliveries.py` 从冻结内容派生分样交付件与凭据，`exports.py` 生成下载件，`evidence.py` 提供证据读模型。`integrity.py` 从只读连接独立重算数据库中记录的批次、封存件与分样交付件。`verify.py` 供委托方离线核对先收到的凭据与交付件。
 - `web/js` 使用原生 ES 模块，分别处理导入、目录、序列、曲线图、峰图、进样证据和交付。`web/css` 分为样式基底、工作台布局和证据视图。页面是 `/`。
 
 ## 本机 API
@@ -37,9 +37,13 @@
 | `GET runs?offset=0`、`POST runs` | 分页读取目录，或核算并保存输入包 |
 | `GET runs/<id>`、`GET runs/<id>/source` | 读取报告或规范化输入 |
 | `GET runs/<id>/injections/<injection>` | 查看单次进样证据 |
-| `POST runs/<id>/snapshot` | 提交 `{}` 封存可交付组分 |
+| `POST runs/<id>/snapshot` | 提交 `{}` 封存可交付组分，并签发分样凭据 |
 | `GET runs/<id>/snapshot.json`、`GET runs/<id>/snapshot.csv` | 下载封存件 |
 | `GET runs/<id>/snapshot/replay` | 以保存的输入重算封存摘要 |
+| `GET runs/<id>/deliveries` | 列出封存时签发的分样凭据 |
+| `GET runs/<id>/deliveries/<sample>/credential.json`、`GET runs/<id>/deliveries/<sample>/delivery.json` | 下载该样品的封存凭据或分样交付件 |
 | `GET runs/<id>/compare?against=<id>` | 返回两批次的样品组分差异 |
+
+委托方离线验件不依赖本服务：`python3 -m chromaledger.verify 凭据.json 交付件.json [--sample 样品号]`。验件只信任先收到的凭据与申领的样品号，交付件自带的摘要不作为依据；缺行、重复行、跨批替换或改值重算随件摘要都返回非零退出码。
 
 `.project-runtime.json` 指定语法检查和各工作流的独立验证入口。验证使用合成数据与本机临时数据库。系统化测试套件留待后续补充。

@@ -44,7 +44,22 @@ export function bindDelivery(current, refresh, notify) {
       }
     });
     actions.append(replay);
-    snap.replaceChildren(el('p', report.snapshot.hash, 'digest'), actions);
+    const parts = [el('p', report.snapshot.hash, 'digest'), actions];
+    if (report.deliveries?.length) {
+      const rows = report.deliveries.map(item => {
+        const credential = el('a', '下载凭据');
+        credential.href = api.deliveryFile(report.id, item.sample_id, 'credential');
+        const drop = el('a', '下载交付件');
+        drop.href = api.deliveryFile(report.id, item.sample_id, 'delivery');
+        return [item.sample_id, item.row_count, credential, drop];
+      });
+      parts.push(el('p', '分样交付：封存时已为下列样品签发凭据。先把对应样品的凭据交给委托方，再转交交付件；' +
+        '委托方用 python3 -m chromaledger.verify 离线验件，只凭先收到的凭据核对。', 'detail'));
+      parts.push(table(['样品', '交付行数', '封存凭据', '交付件'], rows));
+    } else {
+      parts.push(el('p', '此次封存未签发分样凭据，只能整包下载。', 'detail'));
+    }
+    snap.replaceChildren(...parts);
   }
 
   freeze.addEventListener('click', async () => {

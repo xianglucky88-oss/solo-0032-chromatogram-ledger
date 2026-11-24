@@ -24,4 +24,5 @@ export const api = {
   freeze: id => request(`${run(id)}/snapshot`, {}),
   replay: id => request(`${run(id)}/snapshot/replay`),
   download: (id, kind) => `${prefix}${run(id)}/snapshot.${kind}`,
+  deliveryFile: (id, sample, part) => `${prefix}${run(id)}/deliveries/${encodeURIComponent(sample)}/${part}.json`,
 };

@@ -1,5 +1,6 @@
+from .deliveries import summarize
 from .errors import Rejected
-from .repository import find_run, snapshot_row
+from .repository import delivery_rows, find_run, snapshot_row
 from .windows import window_evidence
 
 
@@ -10,6 +11,7 @@ def report_view(conn, run_id):
         'id': run['id'], 'title': run['title'], 'method': run['source']['method'],
         'input_hash': run['input_hash'], 'created_at': run['created_at'],
         'snapshot': {'hash': snapshot['hash'], 'created_at': snapshot['created_at']} if snapshot else None,
+        'deliveries': [summarize(row) for row in delivery_rows(conn, run_id)] if snapshot else [],
         **run['report'],
     }
 

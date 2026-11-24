@@ -1,4 +1,5 @@
 from .analysis import ENGINE, analyze
+from .deliveries import delivery_samples, issue_deliveries
 from .encoding import canonical, digest
 from .errors import Rejected
 from .repository import find_run, snapshot_row
@@ -37,14 +38,15 @@ def freeze(conn, run_id):
     existing = snapshot_row(conn, run_id)
     if existing:
         row = get_snapshot(conn, run_id)
-        return {'hash': row['hash'], 'reused': True}
+        return {'hash': row['hash'], 'reused': True, 'deliveries': delivery_samples(conn, run_id)}
     snapshot = payload(run, run['report'])
     if not snapshot['results']:
         raise Rejected('nothing_to_release', '没有可报告的组分，无法封存。', status=409)
     content = canonical(snapshot)
     fingerprint = digest(content)
     conn.execute('INSERT INTO snapshots (run_id, hash, content) VALUES (?, ?, ?)', (run_id, fingerprint, content))
-    return {'hash': fingerprint, 'reused': False}
+    issued = issue_deliveries(conn, run_id, snapshot_row(conn, run_id))
+    return {'hash': fingerprint, 'reused': False, 'deliveries': issued}
 
 
 def replay(conn, run_id):

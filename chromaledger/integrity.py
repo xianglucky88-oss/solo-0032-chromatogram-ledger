@@ -4,13 +4,14 @@ import json
 import sqlite3
 
 from .analysis import ENGINE, analyze
+from .deliveries import build_deliveries
 from .encoding import canonical, digest
 from .errors import Rejected
 from .sequence import parse_document
 from .snapshots import payload
 
 
-def inspect_run(run, snapshot):
+def inspect_run(run, snapshot, deliveries):
     run_id = run['id']
     issues = []
     if digest(run['source']) != run['input_hash']:
@@ -36,6 +37,21 @@ def inspect_run(run, snapshot):
                 issues.append('snapshot_replay')
     if snapshot is not None and digest(snapshot['content']) != snapshot['hash']:
         issues.append('snapshot_digest')
+    expected = None
+    if snapshot is not None:
+        try:
+            expected = {doc['sample_id']: doc
+                        for doc in build_deliveries(snapshot['hash'], snapshot['content'], snapshot['created_at'])}
+        except (ValueError, KeyError, TypeError, RecursionError):
+            expected = None
+    for delivery in deliveries:
+        if digest(delivery['content']) != delivery['hash'] and 'delivery_digest' not in issues:
+            issues.append('delivery_digest')
+        document = expected.get(delivery['sample_id']) if expected is not None else None
+        mismatched = (document is None or document['content'] != delivery['content']
+                      or document['credential'] != delivery['credential'])
+        if mismatched and 'delivery_replay' not in issues:
+            issues.append('delivery_replay')
     return {'id': run_id, 'issues': issues}
 
 
@@ -47,20 +63,30 @@ def inspect_database(path):
         conn.execute('BEGIN')
         structural = [row[0] for row in conn.execute('PRAGMA quick_check') if row[0] != 'ok']
         if structural:
-            return {'ok': False, 'structural': structural, 'orphaned': [], 'runs': 0, 'snapshots': 0, 'issues': []}
+            return {'ok': False, 'structural': structural, 'orphaned': [], 'runs': 0, 'snapshots': 0,
+                    'deliveries': 0, 'issues': []}
         orphaned = [dict(row) for row in conn.execute('PRAGMA foreign_key_check')]
+        has_deliveries = conn.execute(
+            "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'deliveries'").fetchone()
         rows = conn.execute('SELECT * FROM runs ORDER BY id')
         failures = []
         counts = Counter()
         for run in rows:
             counts['runs'] += 1
-            snapshot = conn.execute('SELECT hash, content FROM snapshots WHERE run_id = ?', (run['id'],)).fetchone()
+            snapshot = conn.execute('SELECT hash, content, created_at FROM snapshots WHERE run_id = ?',
+                                    (run['id'],)).fetchone()
             if snapshot:
                 counts['snapshots'] += 1
-            result = inspect_run(run, snapshot)
+            deliveries = []
+            if has_deliveries:
+                deliveries = conn.execute('SELECT sample_id, hash, content, credential FROM deliveries WHERE run_id = ?',
+                                          (run['id'],)).fetchall()
+                counts['deliveries'] += len(deliveries)
+            result = inspect_run(run, snapshot, deliveries)
             if result['issues']:
                 failures.append(result)
         return {'ok': not failures and not orphaned, 'runs': counts['runs'], 'snapshots': counts['snapshots'],
+                'deliveries': counts['deliveries'],
                 'structural': structural, 'orphaned': orphaned, 'issues': failures}
     finally:
         conn.close()

@@ -5,10 +5,11 @@ from urllib.parse import parse_qs
 
 from .comparison import compare
 from .database import connect
+from .deliveries import list_deliveries
 from .encoding import canonical, decode_upload
 from .errors import Rejected
 from .evidence import injection_trace, report_view
-from .exports import export_snapshot
+from .exports import export_delivery, export_snapshot
 from .intake import ingest, preview
 from .repository import catalog, find_run
 from .snapshots import freeze, replay
@@ -18,6 +19,7 @@ BASE = Path(__file__).resolve().parent.parent
 RUN_ID = r'([A-Za-z0-9][A-Za-z0-9_.-]{0,47})'
 RUN_PATH = re.compile(rf'runs/{RUN_ID}(?:/(.*))?\Z')
 TRACE = re.compile(rf'injections/{RUN_ID}\Z')
+DELIVERY = re.compile(rf'deliveries/{RUN_ID}/(credential|delivery)\.json\Z')
 
 
 @dataclass(frozen=True)
@@ -58,6 +60,13 @@ def run_route(conn, method, run_id, action, query):
             form = action.split('.')[1]
             body, mime = export_snapshot(conn, run_id, form)
             filename = f'{run_id}-snapshot.{form}'
+            return Response(body, mime, headers={'Content-Disposition': f'attachment; filename="{filename}"'})
+        if action == 'deliveries':
+            return json_response({'items': list_deliveries(conn, run_id)})
+        delivery = DELIVERY.fullmatch(action)
+        if delivery:
+            body, mime = export_delivery(conn, run_id, delivery[1], delivery[2])
+            filename = f'{run_id}-{delivery[1]}-{delivery[2]}.json'
             return Response(body, mime, headers={'Content-Disposition': f'attachment; filename="{filename}"'})
         if action == 'compare':
             try:

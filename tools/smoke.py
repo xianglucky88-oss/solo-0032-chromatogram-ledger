@@ -229,14 +229,124 @@ def check_integrity(example):
         live.close()
         copy.close()
     code, result = run_store_verification(corrupt_copy)
-    require(code == 1 and result['issues'] == [{'id': example.document['id'], 'issues': ['snapshot_replay', 'snapshot_digest']}],
+    require(code == 1 and result['issues'] == [{'id': example.document['id'],
+                                                'issues': ['snapshot_replay', 'snapshot_digest', 'delivery_replay']}],
             '完整性检查未识别交付副本中的损坏')
     require(run_store_verification(example.database)[0] == 0, '核验扰动了原始数据库')
+
+
+def run_verify(credential_path, delivery_path, *extra):
+    return subprocess.run([sys.executable, '-m', 'chromaledger.verify', str(credential_path), str(delivery_path), *extra],
+                          capture_output=True, text=True, timeout=10)
+
+
+def canonical_bytes(value):
+    return json.dumps(value, ensure_ascii=False, sort_keys=True, separators=(',', ':')).encode('utf-8')
+
+
+def check_delivery(example):
+    client = example.client
+    document = deepcopy(example.document)
+    document['id'] = 'split-batch'
+    second = deepcopy(next(row for row in document['injections'] if row['id'] == 'S-01'))
+    second['id'] = 'S-01R'
+    second['order'] = 14
+    second['peaks'] = [peak for peak in second['peaks'] if peak['id'] != 'p-beta']
+    document['injections'].append(second)
+    client.api('runs', document, status=201)
+    report = client.api('runs/split-batch')
+    decisions = {row['id']: row['decisions'] for row in report['injections']}
+    require(decisions['S-01R']['A']['status'] == 'reportable' and decisions['S-01R']['B']['status'] == 'held',
+            '第二针应仅组分甲可交付')
+    created = client.api('runs/split-batch/snapshot', {}, status=201)
+    require(created['deliveries'] == ['VIAL-17', 'VIAL-19', 'VIAL-22'], '封存时未按样品签发凭据')
+    again = client.api('runs/split-batch/snapshot', {})
+    require(again['reused'] and again['hash'] == created['hash'] and again['deliveries'] == created['deliveries'],
+            '重试未取回原凭据')
+    items = {item['sample_id']: item for item in client.api('runs/split-batch/deliveries')['items']}
+    require(set(items) == {'VIAL-17', 'VIAL-19', 'VIAL-22'} and items['VIAL-17']['row_count'] == 3, '分样凭据目录错误')
+    client.request(PREFIX + 'runs/split-batch/deliveries/VIAL-25/delivery.json', status=404)
+    credential = client.request(PREFIX + 'runs/split-batch/deliveries/VIAL-17/credential.json')
+    delivery = client.request(PREFIX + 'runs/split-batch/deliveries/VIAL-17/delivery.json')
+    require(client.request(PREFIX + 'runs/split-batch/deliveries/VIAL-17/credential.json') == credential,
+            '凭据再次获取不一致')
+    store = sqlite3.connect(example.database)
+    try:
+        stored = store.execute('SELECT credential FROM deliveries WHERE run_id = ? AND sample_id = ?',
+                               ('split-batch', 'VIAL-17')).fetchone()
+    finally:
+        store.close()
+    require(stored and stored[0].encode('utf-8') == credential, '凭据未持久化，重启后无法取回')
+    rows = json.loads(delivery)['results']
+    identities = {(row['injection_id'], row['target_id']) for row in rows}
+    require(identities == {('S-01', 'A'), ('S-01', 'B'), ('S-01R', 'A')}, '交付行不是该样品全部可交付行')
+    text = delivery.decode('utf-8')
+    require(all(row['sample_id'] == 'VIAL-17' for row in rows)
+            and not any(other in text for other in ('VIAL-19', 'VIAL-22', 'VIAL-25')), '随件材料混入其他样品')
+    with TemporaryDirectory(prefix='chromaledger-delivery-') as scratch:
+        scratch = Path(scratch)
+        cred_file, drop_file = scratch / 'credential.json', scratch / 'delivery.json'
+        cred_file.write_bytes(credential)
+        drop_file.write_bytes(delivery)
+        accepted = run_verify(cred_file, drop_file, '--sample', 'VIAL-17')
+        require(accepted.returncode == 0, f'有效交付被拒收：{accepted.stdout}{accepted.stderr}')
+        require(run_verify(cred_file, drop_file).returncode == 0, '未指定样品号时有效交付被拒收')
+        require(run_verify(cred_file, drop_file, '--sample', 'VIAL-19').returncode == 1, '申领样品号不符却通过验件')
+
+        def rewrite(doc):
+            drop_file.write_bytes(canonical_bytes(doc))
+            return run_verify(cred_file, drop_file).returncode
+
+        original = json.loads(delivery)
+        dropped = [row for row in original['results'] if row['injection_id'] != 'S-01R']
+        require(rewrite({**original, 'results': dropped}) == 1, '缺少第二针甲的交付被接受')
+        first_a = next(row for row in original['results'] if row['injection_id'] == 'S-01' and row['target_id'] == 'A')
+        require(rewrite({**original, 'results': [*dropped, first_a]}) == 1, '重复第一针甲补足行数的交付被接受')
+        tampered = deepcopy(original)
+        tampered['results'][0]['concentration'] = 99.5
+        tampered['snapshot_sha256'] = hashlib.sha256(canonical_bytes(tampered['results'])).hexdigest()
+        require(rewrite(tampered) == 1, '改数值并重算随件摘要的交付被接受')
+        alternate = deepcopy(document)
+        alternate['id'] = 'split-batch-alt'
+        next(row for row in alternate['injections'] if row['id'] == 'S-01')['dilution'] = 3
+        client.api('runs', alternate, status=201)
+        client.api('runs/split-batch-alt/snapshot', {}, status=201)
+        drop_file.write_bytes(client.request(PREFIX + 'runs/split-batch-alt/deliveries/VIAL-17/delivery.json'))
+        require(run_verify(cred_file, drop_file).returncode == 1, '另一批同号样品的交付被接受')
+        other_cred = scratch / 'other-credential.json'
+        other_cred.write_bytes(client.request(PREFIX + 'runs/split-batch/deliveries/VIAL-19/credential.json'))
+        drop_file.write_bytes(delivery)
+        require(run_verify(other_cred, drop_file).returncode == 1, '凭据与交付件张冠李戴却通过验件')
+        empty_doc = {'schema': 1, 'kind': 'chromaledger-delivery', 'run_id': 'split-batch', 'sample_id': 'VIAL-25',
+                     'snapshot_sha256': hashlib.sha256(b'empty').hexdigest(), 'results': []}
+        empty_raw = canonical_bytes(empty_doc)
+        empty_cred = {'schema': 1, 'kind': 'chromaledger-delivery-credential', 'run_id': 'split-batch',
+                      'sample_id': 'VIAL-25', 'snapshot_sha256': empty_doc['snapshot_sha256'],
+                      'delivery_sha256': hashlib.sha256(empty_raw).hexdigest(), 'row_count': 0,
+                      'sealed_at': '2026-11-24T00:00:00.000Z'}
+        (scratch / 'empty-credential.json').write_bytes(canonical_bytes(empty_cred))
+        (scratch / 'empty-delivery.json').write_bytes(empty_raw)
+        require(run_verify(scratch / 'empty-credential.json', scratch / 'empty-delivery.json').returncode == 1,
+                '空交付被认成有效交付')
+    live = sqlite3.connect(example.database)
+    try:
+        with live:
+            live.execute('DELETE FROM deliveries WHERE run_id = ?', ('split-batch',))
+    finally:
+        live.close()
+    require(client.api('runs/split-batch/deliveries')['items'] == [], '旧封存件不应列出分样凭据')
+    client.request(PREFIX + 'runs/split-batch/deliveries/VIAL-17/credential.json', status=404)
+    artifact = client.request(PREFIX + 'runs/split-batch/snapshot.json')
+    require(hashlib.sha256(artifact).hexdigest() == created['hash'], '旧封存件原下载流程失效')
+    require(client.api('runs/split-batch/snapshot/replay')['matches'], '旧封存件原复算流程失效')
+    reused = client.api('runs/split-batch/snapshot', {})
+    require(reused['reused'] and reused['deliveries'] == [], '旧封存件被后补了凭据')
 
 
 CHECKS = {fn.__name__.removeprefix('check_'): fn for fn in (
     check_preview, check_ingest, check_csv, check_alignment, check_assignment, check_calibration,
     check_blank, check_qc, check_reporting, check_snapshot, check_export, check_compare, check_trace, check_integrity,
+    check_delivery,
 )}
 
 

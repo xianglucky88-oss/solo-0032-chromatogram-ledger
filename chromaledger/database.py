@@ -18,6 +18,15 @@ CREATE TABLE IF NOT EXISTS snapshots (
     content TEXT NOT NULL,
     created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
 );
+CREATE TABLE IF NOT EXISTS deliveries (
+    run_id TEXT NOT NULL REFERENCES snapshots(run_id),
+    sample_id TEXT NOT NULL,
+    hash TEXT NOT NULL,
+    content TEXT NOT NULL,
+    credential TEXT NOT NULL,
+    created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+    PRIMARY KEY (run_id, sample_id)
+);
 '''
 
 

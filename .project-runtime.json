@@ -65,6 +65,10 @@
     {
       "workflow_id": "integrity",
       "command": "python3 tools/smoke.py integrity"
+    },
+    {
+      "workflow_id": "delivery",
+      "command": "python3 tools/smoke.py delivery"
     }
   ]
 }

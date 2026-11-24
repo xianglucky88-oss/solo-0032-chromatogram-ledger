@@ -88,6 +88,16 @@
       "responsibility": "封存与摘要重放"
     },
     {
+      "id": "deliveries",
+      "path": "chromaledger/deliveries.py",
+      "responsibility": "分样交付件与凭据签发"
+    },
+    {
+      "id": "verify",
+      "path": "chromaledger/verify.py",
+      "responsibility": "委托方离线验件"
+    },
+    {
       "id": "exports",
       "path": "chromaledger/exports.py",
       "responsibility": "下载件投影"
@@ -291,6 +301,7 @@
       "failure": "全暂缓批次返回冲突",
       "module_ids": [
         "snapshots",
+        "deliveries",
         "repository",
         "encoding",
         "eligibility"
@@ -320,6 +331,26 @@
         "重算输入"
       ],
       "verification": "摘要与两个产物的峰引用"
+    },
+    {
+      "id": "delivery",
+      "name": "分样交付与离线验件",
+      "entry": "GET runs/<id>/deliveries、GET runs/<id>/deliveries/<sample>/credential.json、delivery.json",
+      "success": "凭据随封存签发并可取回，委托方离线确认本样品全部可交付行",
+      "failure": "缺行、重复行、跨批替换、改值重算随件摘要或空件都被拒收",
+      "module_ids": [
+        "deliveries",
+        "snapshots",
+        "exports",
+        "verify",
+        "encoding"
+      ],
+      "steps": [
+        "封存时按样品签发凭据",
+        "从冻结内容下载交付件",
+        "凭据离线核对交付件"
+      ],
+      "verification": "四类篡改、空件与旧封存件场景"
     },
     {
       "id": "compare",

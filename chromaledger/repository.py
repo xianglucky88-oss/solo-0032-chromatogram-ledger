@@ -29,3 +29,13 @@ def catalog(conn, limit, offset):
 def snapshot_row(conn, run_id):
     row = conn.execute('SELECT * FROM snapshots WHERE run_id = ?', (run_id,)).fetchone()
     return dict(row) if row else None
+
+
+def delivery_rows(conn, run_id):
+    rows = conn.execute('SELECT * FROM deliveries WHERE run_id = ? ORDER BY sample_id', (run_id,)).fetchall()
+    return [dict(row) for row in rows]
+
+
+def delivery_row(conn, run_id, sample_id):
+    row = conn.execute('SELECT * FROM deliveries WHERE run_id = ? AND sample_id = ?', (run_id, sample_id)).fetchone()
+    return dict(row) if row else None
