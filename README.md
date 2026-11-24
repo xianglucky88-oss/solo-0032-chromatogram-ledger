@@ -27,6 +27,16 @@ python3 -m chromaledger
 python3 tools/buildcheck.py
 python3 tools/smoke.py
 python3 -m tools.check_store .chromaledger/batches.sqlite3
+python3 -c "import sys; sys.path.insert(0, '.'); from tools.dualdata import check, edge_cases; check.main(); edge_cases.main()"
 ```
 
 语法检查还需要 Node.js 18 或更新版本。冒烟脚本启动独立的本机临时服务和 SQLite 文件，从公开入口检查真实产品操作。数据库核验命令以只读方式检查结构、外键、输入摘要、核算结果与封存件。系统化测试套件留待后续补充。
+
+## 可选双端校准
+
+批次 JSON 顶层带 `dual_end` 段即启用双端引擎（`chromaledger-v2-dual`），不含该段的批次仍走单端引擎（`chromaledger-v1`），旧封存件按原口径复算。双端模式下标准样可组成多组，`registrations` 存放复核员对同一组标准进样登记的候选标称浓度，`designated_checks` 指定用于验证登记的原批核查进样。
+
+- 相邻标准组之间按进样顺序号在两端曲线同浓度响应间线性插值，量程取两端交集；每个组分在同一标准组只用一份登记，前后两段共用同一套登记。
+- 登记选择按组分区分无可用组合、不唯一、唯一三种；指定核查须由整批同一套登记同时通过，唯一可用后再按夹段内最近的前、后核查逐针放行，失败核查与失效标准组不可跨越。
+- 合成场景在 `tools/dualdata/build.py`，核验入口为 `tools/dualdata/check.py`（需求四组数字场景）与 `tools/dualdata/edge_cases.py`（夹段、缺针、超量程、模糊组合、输入校验、旧口径）。
+- 双端封存为 `schema` 2，JSON 与 CSV 的可交付行都指回两端采用登记和两针放行核查。

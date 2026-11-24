@@ -9,6 +9,9 @@ const words = {
   contaminated: '空白污染', unresolved: '证据不足', passed: '核查合格', failed: '核查超差',
   out_of_range: '超量程', curve_unavailable: '曲线不可用', blank_absent: '缺少前序空白',
   blank_blocked: '前序空白阻断', qc_absent: '缺少前序核查样', qc_blocked: '前序核查样阻断',
+  qc_after_absent: '缺少后序核查样', qc_after_blocked: '后序核查样阻断',
+  no_sandwich_segment: '缺少有效夹段', no_usable_combination: '无可用登记组合',
+  ambiguous_combination: '可用登记组合不唯一',
   ready: '可用于定量', insufficient_levels: '有效浓度水平不足', non_positive_slope: '斜率非正',
   poor_fit: '拟合未达门槛',
 };

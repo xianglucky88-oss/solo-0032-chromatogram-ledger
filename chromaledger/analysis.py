@@ -3,6 +3,7 @@ from collections import Counter
 from .assignment import map_injection
 from .blank import evaluate_blank
 from .calibration import fit_sequence
+from .dual_end import analyze_dual
 from .eligibility import decide_sample
 from .quality import evaluate_qc
 
@@ -10,6 +11,13 @@ ENGINE = 'chromaledger-v1'
 
 
 def analyze(document):
+    if 'dual_end' in document:
+        mapped = {row['id']: map_injection(row, document['method']) for row in document['injections']}
+        return analyze_dual(document, mapped)
+    return analyze_single(document)
+
+
+def analyze_single(document):
     method = document['method']
     injections = document['injections']
     mapped = {row['id']: map_injection(row, method) for row in injections}

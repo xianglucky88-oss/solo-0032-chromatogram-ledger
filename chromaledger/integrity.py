@@ -4,10 +4,13 @@ import json
 import sqlite3
 
 from .analysis import ENGINE, analyze
+from .dual_end import ENGINE_DUAL
 from .encoding import canonical, digest
 from .errors import Rejected
 from .sequence import parse_document
 from .snapshots import payload
+
+SUPPORTED_ENGINES = (ENGINE, ENGINE_DUAL)
 
 
 def inspect_run(run, snapshot):
@@ -24,7 +27,7 @@ def inspect_run(run, snapshot):
         issues.append('source_encoding')
     if source['id'] != run_id or source['label'] != run['title'] or source['method']['id'] != run['method_id']:
         issues.append('catalog_mismatch')
-    if not isinstance(report, dict) or report.get('engine') != ENGINE:
+    if not isinstance(report, dict) or report.get('engine') not in SUPPORTED_ENGINES:
         issues.append('engine_unavailable')
     else:
         recomputed = analyze(source)

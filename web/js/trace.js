@@ -5,11 +5,16 @@ import {badge, number, percent, word} from './terms.js';
 function resultEvidence(kind, entry) {
   switch (kind) {
     case 'sample': {
-      const references = [entry.blank_id, entry.qc_id].filter(Boolean).join(' / ');
+      const references = [entry.blank_id, entry.qc_id, entry.qc_after_id].filter(Boolean).join(' / ');
       const issues = entry.issues.map(word).join('、');
-      return [issues || `交付值 ${number(entry.reported)} mg/L`, references && `前序证据 ${references}`].filter(Boolean).join(' · ');
+      const detail = issues || `交付值 ${number(entry.reported)} mg/L`;
+      const registration = entry.registration_ids ? `采用登记 ${entry.registration_ids.join('、')}` : '';
+      return [detail, references && `证据 ${references}`, registration].filter(Boolean).join(' · ');
     }
     case 'qc':
+      if (entry.status === 'unresolved') {
+        return `${word(entry.status)}${entry.reason ? ` · ${word(entry.reason)}` : ''}`;
+      }
       return `观测 ${number(entry.observed)} / 标称 ${number(entry.expected)} · 相对误差 ${percent(entry.relative_error)}`;
     case 'blank':
       return `观测面积 ${number(entry.area)} / 限值 ${number(entry.limit)}`;

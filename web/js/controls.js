@@ -6,7 +6,7 @@ function usageByTarget(injections) {
   for (const row of injections) {
     if (row.kind !== 'sample') continue;
     for (const [target, result] of Object.entries(row.decisions)) {
-      for (const control of [result.blank_id, result.qc_id]) {
+      for (const control of [result.blank_id, result.qc_id, result.qc_after_id]) {
         if (!control) continue;
         const byTarget = usage.get(control) ?? new Map();
         const count = byTarget.get(target) ?? {held: 0, reportable: 0};

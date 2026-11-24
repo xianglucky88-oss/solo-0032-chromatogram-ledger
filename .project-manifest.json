@@ -58,6 +58,11 @@
       "responsibility": "最小二乘曲线拟合"
     },
     {
+      "id": "dual_end",
+      "path": "chromaledger/dual_end.py",
+      "responsibility": "可选双端校准的候选登记、插值与夹段放行"
+    },
+    {
       "id": "analysis",
       "path": "chromaledger/analysis.py",
       "responsibility": "批内数据流编排"
@@ -378,6 +383,29 @@
         "报告不匹配项"
       ],
       "verification": "完整库成功且损坏副本退出非零"
+    },
+    {
+      "id": "dual_end",
+      "name": "可选双端校准",
+      "entry": "tools.dualdata.check / tools.dualdata.edge_cases",
+      "success": "唯一登记组合按夹段两针核查放行并可溯源封存",
+      "failure": "无可用或不唯一组合、缺针、失败核查与失效曲线均暂缓",
+      "module_ids": [
+        "dual_end",
+        "sequence",
+        "calibration",
+        "quality",
+        "blank",
+        "snapshots",
+        "exports"
+      ],
+      "steps": [
+        "按登记拟合各组曲线",
+        "顺序号线性插值并取两端量程交集",
+        "指定核查筛选整批同一套登记",
+        "夹段前后核查逐针放行"
+      ],
+      "verification": "四组需求数字场景与七项边界规则"
     }
   ],
   "complexity": {
@@ -391,7 +419,9 @@
       "量程与稀释换算",
       "事务封存及重试复用",
       "按样品与组分对比",
-      "独立数据库复算"
+      "独立数据库复算",
+      "多组标准候选登记与双端顺序号插值",
+      "指定核查筛选登记组合与夹段两针放行"
     ]
   }
 }

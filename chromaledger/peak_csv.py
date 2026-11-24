@@ -46,7 +46,7 @@ def join_peak_table(value):
         document = decode_upload(metadata.encode('utf-8'))
     except UnicodeError as exc:
         raise Rejected('invalid_json', '序列须使用 UTF-8 JSON。', status=400) from exc
-    object_fields(document, '批次', ('id', 'label', 'method', 'injections'))
+    object_fields(document, '批次', ('id', 'label', 'method', 'injections'), ('dual_end',))
     sequence = array(document['injections'], 'injections', 1, 128)
     injections = set()
     for index, row in enumerate(sequence):
