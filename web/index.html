@@ -64,7 +64,23 @@
               <label for="compare-id">对比批次编号</label><input id="compare-id" required maxlength="48" autocomplete="off">
               <button type="submit">对比</button>
             </form>
+            <p class="detail">常规差异对比。若要在同一入口附带互换判定，请在上方「分样清单互换判定」选择清单。</p>
             <div id="compare-result" aria-live="polite"></div>
+          </section>
+          <section class="panel delivery-panel register-panel" aria-label="分样清单与互换判定">
+            <div class="section-head"><h3>分样清单互换判定</h3><button id="toggle-register-form" type="button" class="quiet">登记新清单</button></div>
+            <p class="detail">按版登记两批复核样之间的母样与允许对应；选清单后仅对方法相容的两批给出按组分的互换判定。旧版清单可原样回查。</p>
+            <form id="register-form" class="register-form" hidden>
+              <label for="register-json">分样清单 JSON</label>
+              <textarea id="register-json" rows="10" spellcheck="false" required placeholder='{"id":"split-a","version":1,...}'></textarea>
+              <button type="submit">登记此版本</button>
+            </form>
+            <form id="register-select-form" class="compare-form">
+              <label for="register-choice">清单版本</label>
+              <select id="register-choice"></select>
+              <button type="submit">判定</button>
+            </form>
+            <div id="register-result" aria-live="polite"></div>
           </section>
         </section>
       </div>

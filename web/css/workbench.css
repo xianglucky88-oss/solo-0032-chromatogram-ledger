@@ -76,7 +76,23 @@
 .download-actions, .compare-form { display: flex; flex-wrap: wrap; align-items: center; gap: .6rem; margin-top: .7rem; }
 .download-actions a { color: var(--accent-dark); margin-right: .35rem; text-underline-offset: 3px; }
 .compare-form input { max-width: 100%; }
+.compare-form select { max-width: 100%; }
 #compare-result .table-wrap { margin-top: .55rem; }
+.register-form { display: grid; gap: .5rem; margin-top: .7rem; }
+.register-form textarea {
+  width: 100%;
+  font: .82rem/1.5 ui-monospace, SFMono-Regular, Consolas, monospace;
+  border: 1px solid #b9cbd6;
+  border-radius: 7px;
+  padding: .55rem .65rem;
+  resize: vertical;
+}
+.register-form button { justify-self: end; }
+.register-block { margin-top: .9rem; }
+.register-block h4 { margin-bottom: .45rem; }
+.register-block .facts { margin: .5rem 0 .7rem; }
+.register-block .table-wrap { margin-top: .4rem; }
+#register-result .digest { margin-top: .4rem; }
 dialog { border: 0; border-radius: var(--radius); width: min(490px, 92vw); padding: 1.25rem; box-shadow: 0 20px 70px #0c32404f; }
 dialog::backdrop { background: #102835a0; }
 .file-label { display: grid; gap: .4rem; margin: .8rem 0 .35rem; }

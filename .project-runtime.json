@@ -59,6 +59,10 @@
       "command": "python3 tools/smoke.py compare"
     },
     {
+      "workflow_id": "register",
+      "command": "python3 tools/smoke.py register"
+    },
+    {
       "workflow_id": "trace",
       "command": "python3 tools/smoke.py trace"
     },

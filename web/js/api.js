@@ -13,12 +13,20 @@ async function request(path, value) {
 }
 
 const run = id => `runs/${encodeURIComponent(id)}`;
+const selection = (register, version) => version
+  ? `register=${encodeURIComponent(register)}&version=${version}` : '';
 export const api = {
   example: () => request('example'),
   catalog: (offset = 0) => request(`runs?offset=${offset}`),
   open: id => request(run(id)),
   trace: (id, injection) => request(`${run(id)}/injections/${encodeURIComponent(injection)}`),
   compare: (id, against) => request(`${run(id)}/compare?against=${encodeURIComponent(against)}`),
+  compareWithRegister: (id, against, register, version) =>
+    request(`${run(id)}/compare?against=${encodeURIComponent(against)}&${selection(register, version)}`),
+  registers: id => request(`${run(id)}/registers`),
+  registerDetail: (id, register, version) =>
+    request(`${run(id)}/registers/${encodeURIComponent(register)}${version ? `?version=${version}` : ''}`),
+  saveRegister: (id, value) => request(`${run(id)}/registers`, value),
   preview: content => request('preview', content),
   ingest: content => request('runs', content),
   freeze: id => request(`${run(id)}/snapshot`, {}),

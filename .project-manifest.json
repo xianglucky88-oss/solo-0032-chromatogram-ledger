@@ -108,9 +108,19 @@
       "responsibility": "批次差异"
     },
     {
+      "id": "register",
+      "path": "chromaledger/register.py",
+      "responsibility": "分样清单按版登记与回查"
+    },
+    {
       "id": "integrity",
       "path": "chromaledger/integrity.py",
       "responsibility": "数据库只读完整性复算"
+    },
+    {
+      "id": "interchange",
+      "path": "chromaledger/interchange.py",
+      "responsibility": "分样配对与组分互换判定"
     }
   ],
   "workflows": [
@@ -339,6 +349,26 @@
         "提取差异"
       ],
       "verification": "两项稀释差异与方法冲突"
+    },
+    {
+      "id": "register",
+      "name": "分样清单互换判定",
+      "entry": "POST runs/<id>/registers、GET runs/<id>/registers/<register>?version=",
+      "success": "按版登记分样清单并给出各组分的超差对数范围与互换结论",
+      "failure": "清单越出所属两批、方法不相容或一针被配两次时拒绝",
+      "module_ids": [
+        "register",
+        "interchange",
+        "comparison",
+        "repository",
+        "encoding"
+      ],
+      "steps": [
+        "校验清单范围与版本",
+        "用尽清单进样枚举可行对应",
+        "按组分核算超差对数范围"
+      ],
+      "verification": "旧版照旧、新凭据排除交叉后的范围、配对资料不足"
     },
     {
       "id": "trace",

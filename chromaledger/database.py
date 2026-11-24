@@ -18,6 +18,19 @@ CREATE TABLE IF NOT EXISTS snapshots (
     content TEXT NOT NULL,
     created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
 );
+CREATE TABLE IF NOT EXISTS registers (
+    id TEXT PRIMARY KEY,
+    register_id TEXT NOT NULL,
+    version INTEGER NOT NULL,
+    left_run TEXT NOT NULL REFERENCES runs(id),
+    right_run TEXT NOT NULL REFERENCES runs(id),
+    supersedes TEXT REFERENCES registers(id),
+    hash TEXT NOT NULL,
+    content TEXT NOT NULL,
+    created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+    UNIQUE (register_id, version)
+);
+CREATE INDEX IF NOT EXISTS registers_runs ON registers(left_run, right_run, register_id, version);
 '''
 
 

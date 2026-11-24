@@ -5,6 +5,7 @@ import {renderCurves} from './curves.js';
 import {bindDelivery} from './delivery.js';
 import {byId, detailList, el} from './dom.js';
 import {bindIntake} from './intake.js';
+import {bindRegisters} from './registers.js';
 import {renderSequence} from './sequence.js';
 import {bindTabs} from './tabs.js';
 import {renderTrace} from './trace.js';
@@ -29,6 +30,7 @@ const delivery = bindDelivery(() => current, async id => {
   await catalog.load();
   if (current?.id === id) await open(id, true);
 }, notify);
+const registers = bindRegisters(() => current, notify);
 
 function updateSequence() {
   renderSequence(byId('injection-list'), current.injections, filter.value, injection, selectInjection);
@@ -71,6 +73,7 @@ async function open(id, keepView = false) {
       selectInjection(id);
     });
     delivery(report, keepView);
+    await registers(report);
     if (!keepView) {
       filter.value = 'all';
       setTab('sequence');
